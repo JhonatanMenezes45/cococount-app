@@ -176,8 +176,10 @@
       progressBar.style.width = '30%';
       ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
       model = await ort.InferenceSession.create(MODEL_URL, {
-        executionProviders: ['webgl', 'wasm']
+        executionProviders: ['wasm']
       });
+      const dbg = document.getElementById('debug-msg');
+      if (dbg) dbg.textContent = 'Modelo OK | inputs: ' + model.inputNames + ' | outputs: ' + model.outputNames;
       progressBar.style.width = '100%';
       loadingMsg.innerHTML = '✅ Modelo carregado!<br>Funciona 100% offline 🎉';
       modeBadge.textContent = '🥥 OFFLINE';
@@ -185,9 +187,11 @@
       modeBadge.style.borderColor = '#c8e64a';
     } catch(e) {
       progressBar.style.width = '100%';
-      loadingMsg.innerHTML = '⚠️ Erro ao carregar modelo.<br>' + e.message;
+      loadingMsg.innerHTML = '⚠️ Erro ao carregar modelo:<br>' + e.message;
       modeBadge.textContent = 'Erro';
       modeBadge.style.color = '#ff6b35';
+      const dbg = document.getElementById('debug-msg');
+      if (dbg) dbg.textContent = 'ERRO load: ' + e.message;
     }
     btnStart.style.display = 'block';
   }
@@ -321,6 +325,8 @@
     if (now - lastFpsTime >= 1000) { fpsVal.textContent = frameCount+' fps'; frameCount=0; lastFpsTime=now; }
     if (now - lastInferenceTime >= INFERENCE_INTERVAL_MS) {
       lastInferenceTime = now;
+      const dbg = document.getElementById('debug-msg');
+      if (dbg) dbg.textContent = 'Rodando inferência...';
       const preds = await runInference();
       drawDetections(preds);
       updateDisplay(preds);
