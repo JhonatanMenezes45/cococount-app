@@ -140,7 +140,7 @@
 </div>
 <script>
   // ===== CONFIGURAÇÃO =====
-  const CONFIDENCE_THRESHOLD = 0.6;
+  const CONFIDENCE_THRESHOLD = 0.25;
   const INFERENCE_INTERVAL_MS = 300;
   const INPUT_SIZE = 320;
   // URL do modelo no GitHub Pages (ajuste para seu usuário)
@@ -233,7 +233,10 @@
       }
 
       const tensor = new ort.Tensor('float32', float32, [1, 3, INPUT_SIZE, INPUT_SIZE]);
-      const results = await model.run({ images: tensor });
+      const inputName = model.inputNames[0];
+      const feeds = {};
+      feeds[inputName] = tensor;
+      const results = await model.run(feeds);
       const output = results[model.outputNames[0]].data;
       // YOLOv8 output: [1, 5, 2100]
       const numDetections = 2100;
@@ -251,6 +254,8 @@
       }
       return nms(predictions);
     } catch(e) {
+      const debug = document.getElementById('debug-msg');
+      if (debug) debug.textContent = 'Erro: ' + e.message;
       console.error('Inference error:', e);
       return [];
     }
