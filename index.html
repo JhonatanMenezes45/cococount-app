@@ -7,6 +7,13 @@
   <link rel="manifest" href="./manifest.json" />
   <title>Contador de Coco Verde</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script>
+    // Força uso da GPU (WebGL) para processamento mais rápido
+    async function setupBackend() {
+      await tf.setBackend('webgl');
+      await tf.ready();
+    }
+  </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -383,7 +390,7 @@
     renderHistorico(); showNotif('Histórico limpo!');
   }
 
-  loadModel();
+  setupBackend().then(() => loadModel());
 
   // Registra Service Worker para funcionar offline
   if ('serviceWorker' in navigator) {
