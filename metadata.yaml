@@ -1,0 +1,21 @@
+description: Ultralytics best model trained on /content/dataset/data.yaml
+author: Ultralytics
+date: '2026-03-15T01:10:13.252002'
+version: 8.4.22
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: coco verde
+args:
+  batch: 1
+  half: false
+  int8: false
+  nms: false
+channels: 3
+end2end: false
