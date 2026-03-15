@@ -1,28 +1,22 @@
-const CACHE_NAME = 'cococount-v1';
+const CACHE_NAME = 'cococount-v2';
 const FILES = [
   './',
   './index.html',
-  './model.json',
-  './group1-shard1of3.bin',
-  './group1-shard2of3.bin',
-  './group1-shard3of3.bin',
-  './metadata.yaml',
-  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
+  './best.onnx',
+  './manifest.json',
+  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js',
+  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort-wasm.wasm',
+  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort-wasm-simd.wasm',
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600;700&display=swap'
 ];
 
-// Instala e guarda todos os arquivos no cache
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      console.log('Guardando arquivos no cache...');
-      return cache.addAll(FILES);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(FILES))
   );
   self.skipWaiting();
 });
 
-// Ativa e remove caches antigos
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -32,7 +26,6 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Intercepta requisições — serve do cache primeiro
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request).then(cached => {
