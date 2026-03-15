@@ -12,6 +12,10 @@
     async function setupBackend() {
       await tf.setBackend('webgl');
       await tf.ready();
+      // Aquece a GPU com uma inferência dummy para evitar lentidão na primeira detecção
+      const dummy = tf.zeros([1, 160, 160, 3]);
+      dummy.dispose();
+      console.log('Backend:', tf.getBackend());
     }
   </script>
   <style>
@@ -148,7 +152,7 @@
   // ===== CONFIGURAÇÃO =====
   const CONFIDENCE_THRESHOLD = 0.62;
   const INFERENCE_INTERVAL_MS = 300;
-  const INPUT_SIZE = 320;
+  const INPUT_SIZE = 160;
   // URL do modelo no GitHub Pages (ajuste para seu usuário)
   const MODEL_URL = './model.json';
   // ========================
