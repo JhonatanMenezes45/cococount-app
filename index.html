@@ -217,6 +217,7 @@
 
   async function runInference() {
     if (!model) return [];
+    const dbg = document.getElementById('debug-msg');
     try {
       // Prepara imagem 320x320
       const offCanvas = document.createElement('canvas');
@@ -227,21 +228,26 @@
       // Converte para float32 normalizado [1, 3, 320, 320]
       const float32 = new Float32Array(1 * 3 * INPUT_SIZE * INPUT_SIZE);
       for (let i = 0; i < INPUT_SIZE * INPUT_SIZE; i++) {
-        float32[i] = imageData.data[i * 4] / 255.0;                    // R
-        float32[INPUT_SIZE * INPUT_SIZE + i] = imageData.data[i * 4 + 1] / 255.0; // G
-        float32[2 * INPUT_SIZE * INPUT_SIZE + i] = imageData.data[i * 4 + 2] / 255.0; // B
+        float32[i] = imageData.data[i * 4] / 255.0;
+        float32[INPUT_SIZE * INPUT_SIZE + i] = imageData.data[i * 4 + 1] / 255.0;
+        float32[2 * INPUT_SIZE * INPUT_SIZE + i] = imageData.data[i * 4 + 2] / 255.0;
       }
 
       const tensor = new ort.Tensor('float32', float32, [1, 3, INPUT_SIZE, INPUT_SIZE]);
       const inputName = model.inputNames[0];
+      const outputName = model.outputNames[0];
+      if (dbg) dbg.textContent = 'Input: ' + inputName + ' | Output: ' + outputName;
+
       const feeds = {};
       feeds[inputName] = tensor;
       const results = await model.run(feeds);
-      const output = results[model.outputNames[0]].data;
-      // YOLOv8 output: [1, 5, 2100]
-      const numDetections = 2100;
-      const predictions = [];
+      const outputTensor = results[outputName];
+      const output = outputTensor.data;
+      const dims = outputTensor.dims; // [1, 5, 2100]
+      const numDetections = dims[2];
+      if (dbg) dbg.textContent = 'dims: ' + dims + ' | detecções: ' + numDetections;
 
+      const predictions = [];
       for (let i = 0; i < numDetections; i++) {
         const confidence = output[4 * numDetections + i];
         if (confidence > CONFIDENCE_THRESHOLD) {
@@ -252,10 +258,11 @@
           predictions.push({ x: cx, y: cy, width: w, height: h, confidence });
         }
       }
-      return nms(predictions);
+      const final = nms(predictions);
+      if (dbg) dbg.textContent = 'OK: ' + final.length + ' cocos | conf>' + CONFIDENCE_THRESHOLD;
+      return final;
     } catch(e) {
-      const debug = document.getElementById('debug-msg');
-      if (debug) debug.textContent = 'Erro: ' + e.message;
+      if (dbg) dbg.textContent = 'ERRO: ' + e.message;
       console.error('Inference error:', e);
       return [];
     }
