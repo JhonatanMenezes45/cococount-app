@@ -6,18 +6,8 @@
   <meta name="theme-color" content="#0d2b0d" />
   <link rel="manifest" href="./manifest.json" />
   <title>Contador de Coco Verde</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
-  <script>
-    // Força uso da GPU (WebGL) para processamento mais rápido
-    async function setupBackend() {
-      await tf.setBackend('webgl');
-      await tf.ready();
-      // Aquece a GPU com uma inferência dummy para evitar lentidão na primeira detecção
-      const dummy = tf.zeros([1, 160, 160, 3]);
-      dummy.dispose();
-      console.log('Backend:', tf.getBackend());
-    }
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -150,11 +140,11 @@
 </div>
 <script>
   // ===== CONFIGURAÇÃO =====
-  const CONFIDENCE_THRESHOLD = 0.62;
+  const CONFIDENCE_THRESHOLD = 0.6;
   const INFERENCE_INTERVAL_MS = 300;
-  const INPUT_SIZE = 100;
+  const INPUT_SIZE = 320;
   // URL do modelo no GitHub Pages (ajuste para seu usuário)
-  const MODEL_URL = './model.json';
+  const MODEL_URL = './best.onnx';
   // ========================
 
   let model = null, isRunning = false;
@@ -184,7 +174,10 @@
     try {
       loadingMsg.innerHTML = 'Carregando modelo offline...<br>Aguarde, só precisa fazer isso uma vez.';
       progressBar.style.width = '30%';
-      model = await tf.loadGraphModel(MODEL_URL);
+      ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/';
+      model = await ort.InferenceSession.create(MODEL_URL, {
+        executionProviders: ['webgl', 'wasm']
+      });
       progressBar.style.width = '100%';
       loadingMsg.innerHTML = '✅ Modelo carregado!<br>Funciona 100% offline 🎉';
       modeBadge.textContent = '🥥 OFFLINE';
@@ -225,39 +218,37 @@
   async function runInference() {
     if (!model) return [];
     try {
-      // Prepara imagem
-      const tensor = tf.tidy(() => {
-        return tf.image.resizeBilinear(
-          tf.browser.fromPixels(video), [INPUT_SIZE, INPUT_SIZE]
-        ).div(255.0).expandDims(0);
-      });
+      // Prepara imagem 320x320
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = INPUT_SIZE; offCanvas.height = INPUT_SIZE;
+      offCanvas.getContext('2d').drawImage(video, 0, 0, INPUT_SIZE, INPUT_SIZE);
+      const imageData = offCanvas.getContext('2d').getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
 
-      const result = await model.executeAsync(tensor);
-      tensor.dispose();
+      // Converte para float32 normalizado [1, 3, 320, 320]
+      const float32 = new Float32Array(1 * 3 * INPUT_SIZE * INPUT_SIZE);
+      for (let i = 0; i < INPUT_SIZE * INPUT_SIZE; i++) {
+        float32[i] = imageData.data[i * 4] / 255.0;                    // R
+        float32[INPUT_SIZE * INPUT_SIZE + i] = imageData.data[i * 4 + 1] / 255.0; // G
+        float32[2 * INPUT_SIZE * INPUT_SIZE + i] = imageData.data[i * 4 + 2] / 255.0; // B
+      }
 
-      // Processa resultado YOLOv8
-      const data = Array.isArray(result) ? result[0] : result;
-      const rawData = await data.array();
-      if (Array.isArray(result)) result.forEach(t => t.dispose());
-      else result.dispose();
-
-      // YOLOv8 output: [1, 5, 8400] -> transpor para [8400, 5]
+      const tensor = new ort.Tensor('float32', float32, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+      const results = await model.run({ images: tensor });
+      const output = results[model.outputNames[0]].data;
+      // YOLOv8 output: [1, 5, 2100]
+      const numDetections = 2100;
       const predictions = [];
-      const output = rawData[0]; // [5, 8400]
-      const numDetections = output[0].length;
 
       for (let i = 0; i < numDetections; i++) {
-        const confidence = output[4][i];
+        const confidence = output[4 * numDetections + i];
         if (confidence > CONFIDENCE_THRESHOLD) {
-          const cx = output[0][i];
-          const cy = output[1][i];
-          const w  = output[2][i];
-          const h  = output[3][i];
+          const cx = output[0 * numDetections + i];
+          const cy = output[1 * numDetections + i];
+          const w  = output[2 * numDetections + i];
+          const h  = output[3 * numDetections + i];
           predictions.push({ x: cx, y: cy, width: w, height: h, confidence });
         }
       }
-
-      // NMS simples para remover duplicatas
       return nms(predictions);
     } catch(e) {
       console.error('Inference error:', e);
@@ -394,7 +385,7 @@
     renderHistorico(); showNotif('Histórico limpo!');
   }
 
-  setupBackend().then(() => loadModel());
+  loadModel();
 
   // Registra Service Worker para funcionar offline
   if ('serviceWorker' in navigator) {
